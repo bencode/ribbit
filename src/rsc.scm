@@ -2237,6 +2237,9 @@
 
       (if 1))))
 
+(pp encoding-original-92)
+(step)
+
 
 
 (define encoding-skip-92
@@ -3257,6 +3260,7 @@
                                         (map car encoding-skip-92)
                                         stats
                                         encoding-size))))))
+                         (step)
                          (encoding-optimal-add-variables encoding host-config)
                          encoding))
 
@@ -3267,6 +3271,7 @@
          (symtbl (car symtbl-and-symbols*))
          (symbols* (cdr symtbl-and-symbols*))
          (stream (encode-program prog symtbl encoding (encoding-inst-get encoding '(skip int long)) encoding-size))
+         (_ (step))
 
          (symtbl-stream (symtbl->stream symtbl symbols* (if hyperbyte? 256 encoding-size)))
          (stream 
@@ -3308,9 +3313,7 @@
 
 (define (encode-program proc syms encoding skip-optimization? encoding-size)
 
-  (define skip-optimization (if (eqv? encoding 'raw) 
-                              #t
-                              skip-optimization?))
+  (define skip-optimization skip-optimization?)
 
 
   (define encoding-size/2 (quotient encoding-size 2))
@@ -3482,7 +3485,13 @@
                     (enc (c-rib-opnd code)
                          encoding
                          #f
-                         (cons (encoding-inst-start encoding 'if) stream)))))
+                         (if (eqv? encoding 'raw)
+                           (rib
+                             'if 
+                             0
+                             stream)
+                           (cons (encoding-inst-start encoding 'if) stream)
+                           )))))
             (else 
               (error "Cannot encode instruction" code)))))))
 
