@@ -2804,9 +2804,59 @@
           2))))
   cost)
 
+(define (encode-lzss-on-two-bytes stream encoding-size host-config)
+  (define header-tag 192)
+  (define bit-header 2)
+  (define length-header 2) ;; 3 to 6 (inclusive). Must not exceed 6
+  (define offset-header 12) ;; encode length on 
+
+  (define encoding-size/2 (quotient encoding-size 2))
+
+  (define (encode encoded-stream tail)
+    (let ((code (car encoded-stream)))
+      (encode 
+        (cdr encoded-stream)
+        (cond
+          ((pair? code)
+           (let* ((len (car code))
+                  (offset (cadr code))
+                  (first-byte
+                    (+
+                      header-tag
+                      (* (- len 3) (arithmetic-shift 1 (- offset-header 8)))
+                      (arithmetic-shift-left 8 offset)))
+                  (second-byte
+                    (bitwise-and offset 255)))
+             (append
+               first-byte
+               second-byte
+               tail)))
+          (else
+            (append 
+              code 
+              tail))))))
+
+  (if (not (eqv? encoding-size 256))
+    (error "Encoding size must be 256"))
+
+  (let* ((encoded-stream 
+           (LZSS 
+             stream 
+             (arithmetic-shift 1 length-header)
+             (arithmetic-shift 1 offset-header)
+             encoding-size 
+             (lambda (x) (if (pair? x) 2 1)))))
+
+    ;(add-variables! host-config tag)
+
+    (encode
+      encoded-stream
+      '())))
 
 
-(define (encode-lzss stream encoding-size host-config)
+
+
+(define (encode-lzss-with-tag stream encoding-size host-config)
 
   (define encoding-size/2 (quotient encoding-size 2))
 
@@ -3229,13 +3279,24 @@
   (let* ((prog (encode-constants proc host-config))
 
          (hyperbyte? (host-config-feature-live? host-config 'encoding/hyperbyte))
+         (compression?-tag (or (host-config-feature-live? host-config 'encoding/compression/tag)
+                               (host-config-feature-live? host-config 'encoding/compression))) ;; default
+
+         (compression?-2b (host-config-feature-live? host-config 'encoding/compression/2b))
+         (compression? (or compression?-tag compression?-2b))
+
          (encoding-size 
-           (if hyperbyte? 
-             (if (not (eqv? encoding-size 256))
-               (error "Hyperbyte encoding only supports 256 byte encoding")
-               16)
-             encoding-size))
-         
+           (cond 
+             (hyperbyte?
+               (if (not (eqv? encoding-size 256))
+                 (error "Hyperbyte encoding only supports 256 byte encoding")
+                 16))
+             (compression?-2b
+               (if (not (eqv? encoding-size 256))
+                 (error "2b compression only supports 256 byte encoding")
+                 192)) ;; reserve the top 64 bytes for the 2b compression
+             (else
+               encoding-size)))
 
          (encoding (cond
                       ((and (string=? "original" encoding-name)
@@ -3261,7 +3322,7 @@
                          encoding))
 
                       (else
-                        (error "Cannot find encoding :" encoding-name))))
+                        (error "Cannot find encoding (or number of byte not supported) :" encoding-name))))
 
          (symtbl-and-symbols* (encode-symtbl prog exports host-config (encoding-inst-size encoding '(call sym short))))
          (symtbl (car symtbl-and-symbols*))
@@ -3276,7 +3337,7 @@
 
          (compression? (host-config-feature-live? host-config 'compression/lzss))
          (stream (if compression?
-                   (encode-lzss 
+                   ((if compression?-tag encode-lzss-with-tag encode-lzss-on-two-bytes)
                      stream
                      encoding-size
                      host-config)
