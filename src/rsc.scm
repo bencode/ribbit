@@ -4377,7 +4377,6 @@
                            minify?
                            verbosity
                            progress-status
-                           primitives
                            features-enabled
                            features-disabled
                            encoding-name
@@ -4460,7 +4459,6 @@
                (lib-path '())
                (src-path #f)
                (minify? #f)
-               (primitives #f)
                (features-enabled '())
                (features-disabled '())
                (rvm-path #f)
@@ -4488,9 +4486,6 @@
                          ((and (pair? rest) (member arg '("-m" "--minify")))
                           (set! minify? #t)
                           (loop rest))
-                         ((and (pair? rest) (member arg '("-p" "--primitives")))
-                          (set! primitives (read (open-input-string (car rest))))
-                          (loop (cdr rest)))
                          ((and (pair? rest) (member arg '("-e" "--encoding")))
                           (set! encoding-name (car rest))
                           (loop (cdr rest)))
@@ -4564,7 +4559,6 @@
                  minify?
                  verbosity
                  progress-status
-                 primitives
                  features-enabled
                  features-disabled
                  encoding-name
