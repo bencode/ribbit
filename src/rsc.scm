@@ -4309,12 +4309,35 @@
            (reverse (cons (substring str i (string-length str)) out))
            "")))))
 
-(define (write-target-code output-path target-code)
+(define (write-target-code output-path target-code generate-executable? target)
   (if (equal? output-path "-")
-      (display target-code)
+    (display target-code)
+    (if generate-executable?
+      (let ((host-output (string-append output-path "." target)))
+        ;; generate host file at host-output file
+        (call-with-output-file 
+          (string-append output-path "." target)
+          (lambda (port)
+            (display target-code port)))
+
+        ;; Call host/<host>/build on host-output to generate output file
+        (shell-cmd
+          (string-append
+            (path-expand
+              (string-append 
+                "host/"
+                target 
+                "/build")
+              (root-dir))
+            " \""
+            host-output
+            "\" \""
+            output-path
+            "\"")))
+
       (call-with-output-file output-path
-        (lambda (port)
-          (display target-code port)))))
+                             (lambda (port)
+                               (display target-code port))))))
 
 ;;;----------------------------------------------------------------------------
 
@@ -4368,6 +4391,8 @@
 
   (else
 
+
+
    (define (fancy-compiler src-path
                            output-path
                            rvm-path
@@ -4375,6 +4400,7 @@
                            input-path
                            lib-path
                            minify?
+                           generate-executable?
                            verbosity
                            progress-status
                            features-enabled
@@ -4444,8 +4470,12 @@
                                    byte-stats
                                    program-compiled)))
              (report-status "Writing target code")
-             (write-target-code output-path generated-code)
-             (report-done))))))
+             (write-target-code output-path generated-code generate-executable? target)
+             (report-done)
+
+
+             )))))
+
 
    (define (parse-cmd-line args)
      (if (null? (cdr args))
@@ -4459,6 +4489,7 @@
                (lib-path '())
                (src-path #f)
                (minify? #f)
+               (generate-executable? #f)
                (features-enabled '())
                (features-disabled '())
                (rvm-path #f)
@@ -4483,9 +4514,6 @@
                          ((and (pair? rest) (member arg '("-l" "--library")))
                           (set! lib-path (cons (car rest) lib-path))
                           (loop (cdr rest)))
-                         ((and (pair? rest) (member arg '("-m" "--minify")))
-                          (set! minify? #t)
-                          (loop rest))
                          ((and (pair? rest) (member arg '("-e" "--encoding")))
                           (set! encoding-name (car rest))
                           (loop (cdr rest)))
@@ -4498,13 +4526,18 @@
                          ((and (pair? rest) (member arg '("-f-" "--disable-feature")))
                           (set! features-disabled (cons (string->symbol (car rest)) features-disabled))
                           (loop (cdr rest)))
-
                          ((and (pair? rest) (member arg '("-bs" "--byte-stats")))
                           (set! byte-stats (string->number (car rest)))
                           (loop (cdr rest)))
-
                          ((member arg '("-cs" "--call-stats"))
                           (set! call-stats #t)
+                          (loop rest))
+
+                         ((member arg '("-m" "--minify"))
+                          (set! minify? #t)
+                          (loop rest))
+                         ((member arg '("-x" "--generate-eXecutable"))
+                          (set! generate-executable? #t)
                           (loop rest))
 
                          ((member arg '("-v" "--v"))
@@ -4557,6 +4590,7 @@
                  input-path
                  (if (eq? lib-path '()) '("empty") lib-path)
                  minify?
+                 generate-executable?
                  verbosity
                  progress-status
                  features-enabled
@@ -4564,6 +4598,7 @@
                  encoding-name
                  byte-stats
                  call-stats)))))
+
    (parse-cmd-line (cmd-line))
 
    (exit-program-normally)))
