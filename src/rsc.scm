@@ -2804,46 +2804,48 @@
           2))))
   cost)
 
-(define (encode-lzss-on-two-bytes stream encoding-size host-config)
-  (define header-tag 192)
-  (define bit-header 2)
-  (define length-header 2) ;; 3 to 6 (inclusive). Must not exceed 6
-  (define offset-header 12) ;; encode length on 
+(define (encode-lzss-on-two-bytes stream bit-header length-header offset-header encoding-size host-config)
+  ;; assuming tag is all 1
+  (define header-tag (if (eqv? bit-header 2) 192 128))
 
-  (define encoding-size/2 (quotient encoding-size 2))
+  ;(define encoding-size/2 (quotient encoding-size 2))
 
   (define (encode encoded-stream tail)
-    (let ((code (car encoded-stream)))
-      (encode 
-        (cdr encoded-stream)
-        (cond
-          ((pair? code)
-           (let* ((len (car code))
-                  (offset (cadr code))
-                  (first-byte
-                    (+
-                      header-tag
-                      (* (- len 3) (arithmetic-shift 1 (- offset-header 8)))
-                      (arithmetic-shift-left 8 offset)))
-                  (second-byte
-                    (bitwise-and offset 255)))
-             (append
-               first-byte
-               second-byte
-               tail)))
-          (else
-            (append 
-              code 
-              tail))))))
+    (if (pair? encoded-stream)
+      (let ((code (car encoded-stream)))
+        (encode 
+          (cdr encoded-stream)
+          (cond
+            ((pair? code)
+             (let* ((offset (car code))
+                    (len (cadr code))
+                    (first-byte
+                      (+
+                        header-tag
+                        (* (- len 3) (arithmetic-shift 1 (- offset-header 8)))
+                        (arithmetic-shift offset -8)))
+                    (second-byte
+                      (bitwise-and offset 255)))
+               (pp (cons code first-byte))
+               (pp (cons code second-byte))
+               `(,first-byte
+                 ,second-byte
+                 .
+                 ,tail)))
+            (else
+              (cons 
+                code 
+                tail)))))
+      tail))
 
-  (if (not (eqv? encoding-size 256))
-    (error "Encoding size must be 256"))
+  (if (not (eqv? (+ bit-header length-header offset-header) 16))
+    (error "Bit header, length header and offset header must add up to 16"))
 
   (let* ((encoded-stream 
            (LZSS 
              stream 
-             (arithmetic-shift 1 length-header)
              (arithmetic-shift 1 offset-header)
+             (arithmetic-shift 1 length-header)
              encoding-size 
              (lambda (x) (if (pair? x) 2 1)))))
 
@@ -3275,7 +3277,10 @@
         (cons (car stream) result))
       result)))
 
+
 (define (encode proc exports host-config byte-stats encoding-name encoding-size)
+  (define compression/2b-bits 192)
+
   (let* ((prog (encode-constants proc host-config))
 
          (hyperbyte? (host-config-feature-live? host-config 'encoding/hyperbyte))
@@ -3294,7 +3299,7 @@
              (compression?-2b
                (if (not (eqv? encoding-size 256))
                  (error "2b compression only supports 256 byte encoding")
-                 192)) ;; reserve the top 64 bytes for the 2b compression
+                 compression/2b-bits)) ;; reserve the top 64 or 128 bytes for the 2b compression
              (else
                encoding-size)))
 
@@ -3335,12 +3340,24 @@
              stream
              (append symtbl-stream stream)))
 
-         (compression? (host-config-feature-live? host-config 'compression/lzss))
          (stream (if compression?
-                   ((if compression?-tag encode-lzss-with-tag encode-lzss-on-two-bytes)
-                     stream
-                     encoding-size
-                     host-config)
+
+                   (if compression?-tag 
+                     (encode-lzss-with-tag
+                       stream
+                       encoding-size
+                       host-config)
+
+                     (encode-lzss-on-two-bytes
+                       stream
+                       (if (eqv? compression/2b-bits 192)
+                         2
+                         1)
+                       4
+                       10
+                       encoding-size
+                       host-config))
+
                    stream)))
 
     (if hyperbyte?
