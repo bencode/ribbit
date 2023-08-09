@@ -2804,6 +2804,42 @@
           2))))
   cost)
 
+(define (decompress-lzss-2b stream bit-header length-header offset-header)
+  (define header-tag (if (eqv? bit-header 2) 192 128))
+
+  (define ones (lambda (x) (- (arithmetic-shift 1 x) 1)))
+
+  ;; gives a number with a n 1 followed by m 0 in the binary representation
+  (define mask (lambda (n m) (arithmetic-shift (ones n) m)))
+
+
+
+  (define (decode stream tail)
+    (if (pair? stream)
+      (if (>= (car stream)  192)
+        (let ((first-bit (car stream))
+              (second-bit (cadr stream)))
+          (decode
+            (cddr stream)
+            (cons
+              (list
+                (+
+                  (* 256 (bitwise-and first-bit (mask (- offset-header 8) 0)))
+                  second-bit)
+                (+ 3 (arithmetic-shift (bitwise-and first-bit (mask length-header (- offset-header 8))) (- 8 offset-header))))
+              tail)))
+        (decode
+          (cdr stream)
+          (cons (car stream) tail)))
+
+        
+      
+      tail))
+
+  (decode stream '()))
+
+
+
 (define (encode-lzss-on-two-bytes stream bit-header length-header offset-header encoding-size host-config)
   ;; assuming tag is all 1
   (define header-tag (if (eqv? bit-header 2) 192 128))
@@ -2817,6 +2853,7 @@
           (cdr encoded-stream)
           (cond
             ((pair? code)
+             (step)
              (let* ((offset (car code))
                     (len (cadr code))
                     (first-byte
@@ -2827,7 +2864,7 @@
                     (second-byte
                       (bitwise-and offset 255)))
                (pp (cons code first-byte))
-               (pp (cons code second-byte))
+               ;(pp (cons code second-byte))
                `(,first-byte
                  ,second-byte
                  .
@@ -2847,13 +2884,26 @@
              (arithmetic-shift 1 offset-header)
              (arithmetic-shift 1 length-header)
              encoding-size 
-             (lambda (x) (if (pair? x) 2 1)))))
+             (lambda (x) (if (pair? x) 2 1))))
+         (return (encode
+                   encoded-stream
+                   '()))
+         (dec (decompress-lzss-2b 
+                return
+                bit-header
+                length-header
+                offset-header)))
 
-    ;(add-variables! host-config tag)
+    #;(pp 
+      (reverse (map list dec encoded-stream)))
 
-    (encode
-      encoded-stream
-      '())))
+
+    (if (equal? dec
+                encoded-stream)
+      (display "... ensuring that decompression works ...")
+      (error "Decompression failed"))))
+
+
 
 
 
@@ -3359,6 +3409,7 @@
                        host-config))
 
                    stream)))
+
 
     (if hyperbyte?
       (append 
