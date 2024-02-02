@@ -1,58 +1,60 @@
+;(function() {
+
 // @@(location import)@@
 
 // @@(replace ");'u?>vD?>vRD?>vRA?>vRA?>vR:?>vR=!(:lkm!':lkv6y" (encode 92)
-input = ");'u?>vD?>vRD?>vRA?>vRA?>vR:?>vR=!(:lkm!':lkv6y";
+let input = ");'u?>vD?>vRD?>vRA?>vRA?>vR:?>vR=!(:lkm!':lkv6y";
 // )@@
 
 // @@(location decl)@@
 
 // @@(feature (or debug debug-trace)
-debug = true;
+const debug = true;
 // )@@
 // @@(feature (and (not debug) (not debug-trace))
-debug = false;
+const debug = false;
 // )@@
 
 
 
-lengthAttr = "length";
+const lengthAttr = "length";
 // @@(feature (and js/node js/web)
-isNode = process?.versions?.node != null;
+const isNode = process?.versions?.node != null;
 if (isNode) { 
 // )@@
 
 // @@(feature (or js/node (not js/web))
 // Implement putchar/getchar to the terminal
 
-fs = require("fs"); // @@(feature (or js/node/fs ##getchar ##putchar))@@
+const fs = require("fs"); // @@(feature (or js/node/fs ##getchar ##putchar))@@
 
-putchar = (c) => {
+const putchar = (c) => {
     let buffer = Buffer.alloc(1);
     buffer[0] = c;
     fs.writeSync(1, buffer, 0, 1);
     return c;
 };
 
-getchar_sync = () => {
+const getchar_sync = () => {
     let buffer = Buffer.alloc(1);
     if (fs.readSync(0, buffer, 0, 1))
         return buffer[0];
     return -1;
 };
 
-getchar = () => {
+const getchar = () => {
     push(pos<input[lengthAttr] ? get_byte() : getchar_sync());
     return true; // indicate that no further waiting is necessary
 };
 
-sym2str = (s) => chars2str(s[1][0]);  //debug
-chars2str = (s) => (s===NIL) ? "" : (String.fromCharCode(s[0])+chars2str(s[1]));  //debug
+const sym2str = (s) => chars2str(s[1][0]);  //debug
+const chars2str = (s) => (s===NIL) ? "" : (String.fromCharCode(s[0])+chars2str(s[1]));  //debug
 
 // @@(feature (or debug debug-trace error-msg) (use sym2str chars2str)
-show_opnd = (o) => is_rib(o) && o[2] === 2 ? ("sym " + sym2str(o)) :
+const show_opnd = (o) => is_rib(o) && o[2] === 2 ? ("sym " + sym2str(o)) :
     is_rib(o) && o[2] === 1 ? ("proc " + (!is_rib(o[0]) ? sym2str(symbol_ref_debug(o[0])) : ""))
     : ("int " + o);  //debug
-show_stack = () => {  //debug
+const show_stack = () => {  //debug
     let s = stack;  //debug
     let r = [];  //debug
     while (!s[2]) { r[r[lengthAttr]]=s[0]; s=s[1]; }  //debug
@@ -67,17 +69,15 @@ show_stack = () => {  //debug
 // @@(feature js/web
 
 // Implement a simple console as a textarea in the web page
-domdoc = document;
-selstart = 0;
-addEventListenerAttr = "addEventListener";
-selectionStartAttr = "selectionStart";
+const doc = document;
+let selstart = 0;
 
-domdoc[addEventListenerAttr]("DOMContentLoaded", () => {
-    dombody = domdoc.body;
-    txtarea = dombody.appendChild(domdoc.createElement("textarea"));
+doc.addEventListener("DOMContentLoaded", () => {
+    const body = domdoc.body;
+    const txtarea = body.appendChild(doc.createElement("textarea"));
     txtarea.style = "width:100%;height:50vh;";
-    dombody[addEventListenerAttr]("keypress", (e) => {
-        let x = txtarea[selectionStartAttr];
+    body.addEventListener("keypress", (e) => {
+        let x = txtarea.selectionStart;
         if (x<selstart) selstart=x;
         if (e.keyCode==13) {
             e.preventDefault();
@@ -89,9 +89,9 @@ domdoc[addEventListenerAttr]("DOMContentLoaded", () => {
     run();
 });
 
-putchar = (c) => (selstart=txtarea[selectionStartAttr]=(txtarea.value += String.fromCharCode(c))[lengthAttr], c);
+const putchar = (c) => (selstart=txtarea[selectionStartAttr]=(txtarea.value += String.fromCharCode(c))[lengthAttr], c);
 
-getchar = () => pos<input[lengthAttr] && push(get_byte());
+const getchar = () => pos<input[lengthAttr] && push(get_byte());
 // )@@
 
 } // @@(feature (and js/node js/web))@@
@@ -102,7 +102,7 @@ getchar = () => pos<input[lengthAttr] && push(get_byte());
 // VM
 
 // @@(feature (or error-msg debug) (use scm2str)
-halt = () => {
+const halt = () => {
   const error_code = pop();
 	const error_msg = new Error(error_code !== undefined && is_rib(error_code) && error_code[2] === 3 ? scm2str(error_code) : `Exit with code: ${error_code}`);
 	throw error_msg;
@@ -111,17 +111,17 @@ halt = () => {
 
 // build the symbol table
 
-pos = 0;
-get_byte = () => input[pos++].charCodeAt(0);
-get_code = () => { let x = get_byte()-35; return x<0 ? 57 : x; };
-get_int = (n) => { let x = get_code(); n *= 46; return x<46 ? n+x : get_int(n+x-46); };
+let pos = 0;
+const get_byte = () => input[pos++].charCodeAt(0);
+const get_code = () => { let x = get_byte()-35; return x<0 ? 57 : x; };
+const get_int = (n) => { let x = get_code(); n *= 46; return x<46 ? n+x : get_int(n+x-46); };
 
 
 // @@(feature compression/lzss/tag
-inp="";
-i=0;
+let inp="";
+let i=0;
 while(pos<input[lengthAttr]){
-    c=get_code();
+    let c=get_code();
     v=String.fromCharCode(c==57?33:c+35);
     if(c==60){ // @@(replace "60" compression/lzss/tag-as-code)@@
         p=get_int(0);
@@ -143,12 +143,12 @@ pos=0;
 // )@@
 
 
-pop = () => { let x = stack[0]; stack = stack[1]; return x; };
+const pop = () => { let x = stack[0]; stack = stack[1]; return x; };
 
-FALSE = [0,0,5]; TRUE = [0,0,5]; NIL = [0,0,5];
+const FALSE = [0,0,5]; TRUE = [0,0,5]; NIL = [0,0,5];
 
-symtbl = NIL;
-n = get_int(0);
+let symtbl = NIL;
+let n = get_int(0);
 while (n-- > 0) symtbl=[[0,[NIL,0,3],2],symtbl,0]; // symbols with empty names
 
 accum = NIL;
@@ -163,24 +163,24 @@ while (1) {
 
 symtbl = [[0,[accum,n,3],2],symtbl,0];
 
-symbol_ref = (n) => list_tail(symtbl,n)[0];
+const symbol_ref = (n) => list_tail(symtbl,n)[0];
 // @@(feature (or debug debug-trace error-msg) (use sym2str chars2str)
-symbol_ref_debug = (n) => list_tail(symtbl_debug,n)[0];
+const symbol_ref_debug = (n) => list_tail(symtbl_debug,n)[0];
 // )@@
-list_tail = (x,i) => i ? list_tail(x[1],i-1) : x;
-inst_tail = (x,i) => i ? inst_tail(x[2],i-1) : x;
+const list_tail = (x,i) => i ? list_tail(x[1],i-1) : x;
+const inst_tail = (x,i) => i ? inst_tail(x[2],i-1) : x;
 
 // decode the instruction graph
 
 if(false){ // @@(feature pipeline-compiler)@@
 
 // @@(feature encoding/skip
-stack = 0;
+let stack = 0;
 
 while (1) {
-  x = get_code();
+  const x = get_code();
   n = x;
-  d = 0;
+  let d = 0;
   op = -1;
   while ((d=[20,20,0,10,11,4,9][++op])+(5>op)*2<n) n -= d+(4<op?1:3);
   //console.log("code : ", x, " arg : ", n, "d : ", d, "op : ", op)
@@ -214,9 +214,10 @@ while (1) {
 if (false) { // @@(feature pipeline-compiler)@@
 // @@(feature encoding/optimal
 
-stack=0;
+let stack=0;
 while(1){
-    x = get_code();
+    const x = get_code();
+    let d = 0;
     n=x;
     op=-1;
 
@@ -254,12 +255,12 @@ while(1){
 
 
 // @@(feature encoding/original
-stack = 0;
+let stack = 0;
 
 while (1) {
-  x = get_code();
+  const x = get_code();
   n = x;
-  d = 0;
+  let d = 0;
   op = -1;
   while ((d=[20,30,0,10,11,4][++op])+2<n) n -= d+3;
   if (x>90)
@@ -278,10 +279,10 @@ while (1) {
 // )@@
 
 // @@(feature (or debug debug-trace error-msg) (use sym2str chars2str)
-symtbl_debug = symtbl;
+const symtbl_debug = symtbl;
 // )@@
 
-set_global = (x) => { symtbl[0][0] = x; symtbl = symtbl[1]; };
+const set_global = (x) => { symtbl[0][0] = x; symtbl = symtbl[1]; };
 
 set_global([0,symtbl,1]); // primitive 0
 set_global(FALSE);
@@ -290,16 +291,16 @@ set_global(NIL);
 
 // RVM core
 
-pc = n[0][2];
+let pc = n[0][2];
 
 stack = [0,0,[5,0,0]]; // primordial continuation (executes halt instr.)
 
 // @@(feature (not error-msg)
-push = (x) => ((stack = [x,stack,0]), true);
+const push = (x) => ((stack = [x,stack,0]), true);
 // )@@
 
 // @@(feature error-msg
-push = (x) => {
+const push = (x) => {
     if (x === undefined) {
         console.log(stack);
         throw "undefined pushed to stack";
@@ -310,13 +311,13 @@ push = (x) => {
 // )@@
 
 // @@(feature debug
-log_return = (s) => {console.log(s); return s;};
+const log_return = (s) => {console.log(s); return s;};
 // )@@
 // @@(feature bool2scm
-bool2scm = (x) => x ? TRUE : FALSE;
+const bool2scm = (x) => x ? TRUE : FALSE;
 // )@@
 // @@(feature str2scm
-str2scm = (s) => {
+const str2scm = (s) => {
     let l = s.length;
     let i = l;
     let a = NIL;
@@ -326,8 +327,8 @@ str2scm = (s) => {
 // )@@
 
 // @@(feature find_sym (use scm2list)
-find_sym = (name, symtbl) => {
-  lst = scm2list(symtbl);
+const find_sym = (name, symtbl) => {
+  const lst = scm2list(symtbl);
   console.log(lst);
   return list_tail(symtbl, lst.indexOf(name))[0];
 
@@ -335,7 +336,7 @@ find_sym = (name, symtbl) => {
 // )@@
 
 // @@(feature function2scm (use foreign call find_sym)
-function2scm = (f) => {
+const function2scm = (f) => {
   let host_call = find_sym('host-call', symtbl);
   let id = find_sym('id', symtbl);
   let arg2 = find_sym('arg2', symtbl);
@@ -365,24 +366,24 @@ function2scm = (f) => {
 // )@@
 
 // @@(feature host2scm (use list2scm str2scm bool2scm function2scm)
-host2scm = (v) => {
+const host2scm = (v) => {
   return ({"number":(x)=>x,"boolean":bool2scm,"string":str2scm,"object":list2scm, 'function':function2scm, 'undefined':()=>NIL}[typeof v](v));
 };
 // )@@
 
 // @@(feature list2scm (use host2scm)
-list2scm = (l,i=0) => (i<l.length?[host2scm(l[i]),list2scm(l,i+1),0]:NIL);
+const list2scm = (l,i=0) => (i<l.length?[host2scm(l[i]),list2scm(l,i+1),0]:NIL);
 // )@@
 
 // @@(feature scm2str
-scm2str = (r) => {
+const scm2str = (r) => {
     let f = (c) => (c===NIL?"":String.fromCharCode(c[0])+f(c[1]));
     return f(r[0]);
 };
 // )@@
 
 // @@(feature scm2bool
-scm2bool = (r) => {
+const scm2bool = (r) => {
   if (r === NIL){
     return [];
   }
@@ -397,7 +398,7 @@ scm2bool = (r) => {
 // )@@
 
 // @@(feature scm2list (use scm2host)
-scm2list = (r) => {
+const scm2list = (r) => {
   let elems = r[2] === 0 ? r : r[0];
   let lst = [];
   let f = (c) => {
@@ -412,8 +413,8 @@ scm2list = (r) => {
 // )@@
 
 // @@(feature scm2function (use scm2host host2scm)
-func_stack = [];
-scm2function = (r) => {
+const func_stack = [];
+const scm2function = (r) => {
   let func = (...args) => {
     func_stack.push(pc);
     push(r);
@@ -431,21 +432,21 @@ scm2function = (r) => {
 // )@@
 
 // @@(feature debug-callback
-debug_callback = (callback) => {
+const debug_callback = (callback) => {
   console.log(callback());
   return true;
 };
 // )@@
 
 // @@(feature scm2symbol (use scm2str)
-scm2symbol = (r) => {
+const scm2symbol = (r) => {
   return scm2str(r[1]);
 };
 // )@@
 
 
 // @@(feature scm2host (use scm2str scm2list scm2bool scm2bool scm2function scm2symbol)
-scm2host = (r) => {
+const scm2host = (r) => {
   if (typeof r === "number")
     return r;
   let tag = r[2];
@@ -455,12 +456,12 @@ scm2host = (r) => {
 
 
 // @@(feature foreign
-foreign = r => [0, r, 7]; // 7 is to tag a foreign object
+const foreign = r => [0, r, 7]; // 7 is to tag a foreign object
 // )@@
 
 // @@(feature host_call (use scm2list)
 // f is a foreign object representing a function
-host_call = () =>{
+const host_call = () =>{
   args = pop();
   f = pop()[1];
   return push(host2scm(f(...scm2list(args))));
@@ -470,19 +471,19 @@ host_call = () =>{
 
 
 
-is_rib = (x) => {
+const is_rib = (x) => {
     if (x === undefined) console.log(stack);
     return x[lengthAttr];
 };
 
-get_opnd = (o) => is_rib(o) ? o : list_tail(stack,o);
-get_cont = () => { let s = stack; while (!s[2]) s = s[1]; return s; };
+const get_opnd = (o) => is_rib(o) ? o : list_tail(stack,o);
+const get_cont = () => { let s = stack; while (!s[2]) s = s[1]; return s; };
 
-prim1 = (f) => () => push(f(pop()));
-prim2 = (f) => () => push(f(pop(),pop()));
-prim3 = (f) => () => push(f(pop(),pop(),pop()));
+const prim1 = (f) => () => push(f(pop()));
+const prim2 = (f) => () => push(f(pop(),pop()));
+const prim3 = (f) => () => push(f(pop(),pop(),pop()));
 
-primitives = [
+const primitives = [
 // @@(primitives (gen body)
   prim3((z, y, x) => [x, y, z]),                    //  @@(primitive (##rib a b c))@@
   prim1((x) => x),                                  //  @@(primitive (##id x))@@
@@ -508,7 +509,7 @@ primitives = [
 // )@@
 ];
 
-run = () => {
+const run = () => {
   while (1) {
     let o = pc[1];
     switch (pc[0]) {
@@ -620,3 +621,5 @@ if (isNode)  // @@(feature (and js/node js/web))@@
 
 
 // @@(location end)@@
+
+})();
